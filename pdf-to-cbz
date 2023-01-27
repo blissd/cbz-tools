@@ -44,12 +44,13 @@ cleanup() {
 }
 
 progress_bar() {
-    pv -c -l -p -t -e -s $PAGE_COUNT -N $1
+    pv -c -l -p -t -e -s $PAGE_COUNT -N $1 
 }
 
 convert_to_webp() {
-    echo convert "$1" "${1%.*}.webp"
-    convert "$1" "${1%.*}.webp"
+    WEBP="${1%.*}.webp"
+    convert "$1" "$WEBP"
+    echo "$WEBP"
 }
 
 export -f convert_to_webp
@@ -61,15 +62,15 @@ if [ "$CBZ_NAME" = "" ]; then
 	CBZ_NAME="${CBZ_NAME%.*}.cbz"
 fi
 
-echo $CBZ_NAME
+echo $PDF has $PAGE_COUNT pages
 
+NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1|head | progress_bar PPM >/dev/null
+pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 | progress_bar PPM  >/dev/null
 
 # Convert output images to webp
-NCPU=$(nproc)
-ls $DIR/*.ppm | xargs -P $NCPU -I{} bash -c 'convert_to_webp {}' | progress_bar WEBP >/dev/null
+find $DIR -name '*.ppm' | while read x; do convert_to_webp "$x"; done | progress_bar WEBP >/dev/null
 
 # Create CBZ archive
 zip --junk-paths "$CBZ_NAME" $DIR/*.webp | progress_bar ZIP >/dev/null
