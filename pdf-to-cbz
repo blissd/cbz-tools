@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+
+DPI=400
+PREFIX=page
+CBZ_NAME=""
+DIR=$(mktemp -d)
+
+usage() {
+	echo "pdf-to-cbz [-d 400] [-o jpeg|web] comic.pdf"
+	exit 0
+}
+
+while getopts ":hq:o:d:" opt; do
+    case $opt in
+        h)
+            usage
+            exit
+            ;;
+		d)
+            DPI=$OPTARG
+            ;;
+        o)
+            CBZ_NAME=$OPTARG
+            ;;
+		\?)
+			echo "Invalid option: $OPTARG" 1>&2
+			exit 1
+			;;
+		:)
+			echo "Invalid option: -$OPTARG requires an argument" 1>&2
+			exit 1
+		    ;;
+    esac
+done
+
+PDF="${@[$OPTIND]}"
+
+cleanup() {
+	rm -rf $DIR
+}
+
+trap 'cleanup' ERR EXIT
+
+if [ "$CBZ_NAME" = "" ]; then
+	CBZ_NAME="$(basename "$PDF")"
+	CBZ_NAME="${CBZ_NAME%.*}.cbz"
+fi
+
+echo $CBZ_NAME
+
+# Count PDF pages
+PAGE_COUNT=$(pdfinfo "$PDF" | awk '/^Pages:/ {print $2}')
+
+# Extract pages as images.
+pdftoppm -r $DPI -progress $PDF $DIR/$PREFIX 2>&1 | pv -c -l -p -t -e -s $PAGE_COUNT -N PPM >/dev/null
+
+# Convert output images to webp
+ls $DIR/*.ppm | pv -c -l -p -t -e -s $PAGE_COUNT -N WEBP | while read x; do
+	convert "$x" "${x%.*}.webp" 
+done
+
+# Create CBZ archive
+zip --junk-paths "$CBZ_NAME" $DIR/*.webp | pv -c -l -p -t -e -s $PAGE_COUNT -N ZIP >/dev/null
+
