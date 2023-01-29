@@ -14,26 +14,29 @@ usage() {
 while getopts ":hq:o:d:" opt; do
     case $opt in
         h)
-            usage
-            exit
-            ;;
-		d)
-            DPI=$OPTARG
-            ;;
+	    usage
+	    exit
+	    ;;
+	d)
+	    DPI=$OPTARG
+	    ;;
         o)
-            CBZ_NAME=$OPTARG
-            ;;
-		\?)
-			echo "Invalid option: $OPTARG" 1>&2
-			exit 1
-			;;
-		:)
-			echo "Invalid option: -$OPTARG requires an argument" 1>&2
-			exit 1
-		    ;;
+	    CBZ_NAME=$OPTARG
+	    ;;
+	\?)
+	    echo "Invalid option: $OPTARG" 1>&2
+	    exit 1
+	    ;;
+	:)
+	    echo "Invalid option: -$OPTARG requires an argument" 1>&2
+	    exit 1
+	    ;;
     esac
 done
 
+shift $((OPTIND-1))
+
+#echo $1
 PDF="$1"
 
 # Count PDF pages
@@ -62,12 +65,15 @@ if [ "$CBZ_NAME" = "" ]; then
 	CBZ_NAME="${CBZ_NAME%.*}.cbz"
 fi
 
-echo $PDF has $PAGE_COUNT pages
+echo "PDF: $PDF" 1>&2
+echo "Pages: $PAGE_COUNT" 1>&2
+echo "Working directory: $DIR" 1>&2
 
 NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 | progress_bar PPM  >/dev/null
+pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 | grep /page | progress_bar PPM  >/dev/null
+#pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 
 
 # Convert output images to webp
 find $DIR -name '*.ppm' | while read x; do convert_to_webp "$x"; done | progress_bar WEBP >/dev/null
