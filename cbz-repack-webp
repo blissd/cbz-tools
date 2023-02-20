@@ -5,20 +5,24 @@
 SOURCE=""
 TARGET=""
 DIR="$(mktemp -d)"
+RESIZE="100%"
 
 usage() {
-	echo "cbz-repack-webp comic.cbz"
+	echo "cbz-repack-webp [-r resize percentage] comic.cbz"
 	exit 0
 }
 
-while getopts ":hq:o:d:" opt; do
+while getopts ":hq:o:r:" opt; do
     case $opt in
         h)
             usage
             exit
             ;;
+	r)
+	    RESIZE="$OPTARG"
+	    ;;
         o)
-            OUT_NAME=$OPTARG
+            OUT_NAME="$OPTARG"
             ;;
 		\?)
 			echo "Invalid option: $OPTARG" 1>&2
@@ -55,17 +59,19 @@ unzip "$SOURCE" -d "$DIR"
 	#rm "$x"
 #done
 
-find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | while read x; do
-  echo "$x" >> $DIR/source-file-names
-  echo echo convert "$x" "${x%.*}.webp" '&&' convert "$x" "${x%.*}.webp" >> $DIR/convert
+page_count=1
+find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
+  # sanitize file names.
+  ext="${x##*.}"
+  page_name=$(printf "$DIR/page-%03d.$ext" "$page_count")
+  mv "$x" "$page_name"  
+  let page_count=page_count+1
+
+  echo "$page_name" >> $DIR/source-file-names
+  echo echo convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.webp" '&&' convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.webp" >> $DIR/convert
 done
 
-#find $DIR -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' > $DIR/image-file-names
-
 NCPU="$(nproc)"
-#cat $DIR/image-file-names | xargs -P $NCPU -I{} convert {} {}.webp
-#cat $DIR/image-file-names | xargs -P $NCPU -I{} rm {}
-#
 
 cat $DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
