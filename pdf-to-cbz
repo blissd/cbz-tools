@@ -62,7 +62,7 @@ trap 'cleanup' ERR EXIT
 
 if [ "$CBZ_NAME" = "" ]; then
 	CBZ_NAME="$(basename "$PDF")"
-	CBZ_NAME="${CBZ_NAME%.*}.cbz"
+	CBZ_NAME="$(dirname "$PDF")/${CBZ_NAME%.*}.cbz"
 fi
 
 echo "PDF: $PDF" 1>&2
