@@ -52,7 +52,7 @@ progress_bar() {
 
 convert_to_webp() {
     WEBP="${1%.*}.webp"
-    convert "$1" "$WEBP"
+    gm convert "$1" "$WEBP"
     echo "$WEBP"
 }
 
@@ -72,11 +72,11 @@ echo "Working directory: $DIR" 1>&2
 NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 | grep /page | progress_bar PPM  >/dev/null
+pdftoppm -r $DPI -progress -png "$PDF" "$DIR/$PREFIX" 2>&1 | grep /page | progress_bar PPM  >/dev/null
 #pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 
 
 # Convert output images to webp
-find $DIR -name '*.ppm' | while read x; do convert_to_webp "$x"; done | progress_bar WEBP >/dev/null
+find $DIR -name '*.png' | while read x; do convert_to_webp "$x"; done | progress_bar WEBP >/dev/null
 
 # Create CBZ archive
 zip --junk-paths "$CBZ_NAME" $DIR/*.webp | progress_bar ZIP >/dev/null
