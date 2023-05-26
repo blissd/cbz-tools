@@ -34,6 +34,26 @@ while getopts ":hq:o:d:" opt; do
     esac
 done
 
+if ! command -v pdfinfo >/dev/null 2>&1; then
+  echo "Error: please install pdfinfo." 1>&2
+  exit 1
+fi
+
+if ! command -v pdftoppm >/dev/null 2>&1; then
+  echo "Error: please install pdftoppm." 1>&2
+  exit 1
+fi
+
+if ! command -v pv >/dev/null 2>&1; then
+  echo "Error: please install pv (progress viewer)." 1>&2
+  exit 1
+fi
+
+if ! command -v gm >/dev/null 2>&1; then
+  echo "Error: please install GraphicsMagic." 1>&2
+  exit 1
+fi
+
 shift $((OPTIND-1))
 
 #echo $1
