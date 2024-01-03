@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+#
+# Repacks a CBZ file to convert JPEG files to WEBP files
+
+SOURCE=""
+TARGET=""
+DIR="$(mktemp -d)"
+RESIZE="100%"
+PAGE_FORMAT=avif
+
+usage() {
+	echo "cbz-repack [-f avif|webp] [-r resize percentage] comic.cbz"
+	exit 0
+}
+
+while getopts ":hq:o:r:f:" opt; do
+    case $opt in
+        h)
+            usage
+            exit
+            ;;
+	f)
+	   PAGE_FORMAT="$OPTARG"
+	;;
+	r)
+	    RESIZE="$OPTARG"
+	    ;;
+        o)
+            OUT_NAME="$OPTARG"
+            ;;
+		\?)
+			echo "Invalid option: $OPTARG" 1>&2
+			exit 1
+			;;
+		:)
+			echo "Invalid option: -$OPTARG requires an argument" 1>&2
+			exit 1
+		    ;;
+    esac
+done
+
+shift $(($OPTIND -1))
+
+SOURCE="$1"
+
+cleanup() {
+	rm -rf $DIR
+}
+
+trap 'cleanup' ERR EXIT
+
+if [ "$TARGET" = "" ]; then
+	TARGET="$(basename "$SOURCE")"
+	TARGET="${TARGET%.*}-$PAGE_FORMAT.cbz"
+fi
+
+echo $TARGET
+
+unzip "$SOURCE" -d "$DIR"
+
+# Convert output images 
+#for x in $(find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}'); do
+	#echo magick convert "$x" "${x%.*}.$PAGE_FORMAT"
+	#magick convert "$x" "${x%.*}.$PAGE_FORMAT"
+	#rm "$x"
+#done
+
+page_count=1
+find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
+  # sanitize file names.
+  ext="${x##*.}"
+  page_name=$(printf "$DIR/page-%03d.$ext" "$page_count")
+  mv "$x" "$page_name"  
+  let page_count=page_count+1
+
+  echo "$page_name" >> $DIR/source-file-names
+  echo echo magick convert "$page_name" -resize "$RESIZE" "${page_name%.*}.$PAGE_FORMAT" '&&' magick convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.$PAGE_FORMAT" >> $DIR/convert
+done
+
+NCPU="$(nproc)"
+
+cat $DIR/convert | xargs -P $NCPU -I{} sh -c {}
+
+cat $DIR/source-file-names | while read x; do rm "$x"; done
+
+rm $DIR/source-file-names $DIR/convert
+
+# Create CBZ archive
+echo zip --junk-paths "$TARGET" "$DIR/*"
+zip --junk-paths "$TARGET" "$DIR"/*
+
