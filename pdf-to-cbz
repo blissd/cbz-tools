@@ -3,31 +3,39 @@
 
 DPI=400
 PREFIX=page
+MIDDLE_FORMAT=png
 CBZ_NAME=""
 DIR=$(mktemp -d)
+PAGE_FORMAT=avif
 
 usage() {
-	echo "pdf-to-cbz [-d 400] [-o jpeg|web] comic.pdf"
+	echo "pdf-to-cbz [-d 400] [-i ppm|png] [-f jpeg|webp|avif] [-o comic.cbz] comic.pdf"
 	exit 0
 }
 
-while getopts ":hq:o:d:" opt; do
-    case $opt in
-        h)
-	    usage
+while getopts ":ho:d:i:f:" opt; do
+	case $opt in
+	    h)
+		usage
 	    exit
 	    ;;
-	d)
+		d)
 	    DPI=$OPTARG
 	    ;;
-        o)
+		i)
+	    MIDDLE_FORMAT=$OPTARG
+		;;
+		f)
+		PAGE_FORMAT=$OPTARG
+	    ;;
+		o)
 	    CBZ_NAME=$OPTARG
 	    ;;
-	\?)
+		\?)
 	    echo "Invalid option: $OPTARG" 1>&2
 	    exit 1
 	    ;;
-	:)
+		:)
 	    echo "Invalid option: -$OPTARG requires an argument" 1>&2
 	    exit 1
 	    ;;
@@ -44,13 +52,13 @@ if ! command -v pdftoppm >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v pv >/dev/null 2>&1; then
-  echo "Error: please install pv (progress viewer)." 1>&2
-  exit 1
-fi
+#if ! command -v pv >/dev/null 2>&1; then
+  #echo "Error: please install pv (progress viewer)." 1>&2
+  #exit 1
+#fi
 
-if ! command -v gm >/dev/null 2>&1; then
-  echo "Error: please install GraphicsMagic." 1>&2
+if ! command -v magick >/dev/null 2>&1; then
+  echo "Error: please install ImageMagic." 1>&2
   exit 1
 fi
 
@@ -67,16 +75,17 @@ cleanup() {
 }
 
 progress_bar() {
-    pv -c -l -p -t -e -s $PAGE_COUNT -N $1 
+    while read x; do echo .; done
+    #pv -c -l -p -t -e -s $PAGE_COUNT -N $1 
 }
 
-convert_to_webp() {
-    WEBP="${1%.*}.webp"
-    gm convert "$1" "$WEBP"
-    echo "$WEBP"
+convert_page() {
+    OUT="${1%.*}.$PAGE_FORMAT"
+    magick convert "$1" "$OUT"
+    echo "$OUT"
 }
 
-export -f convert_to_webp
+export -f convert_page
 
 trap 'cleanup' ERR EXIT
 
@@ -88,16 +97,23 @@ fi
 echo "PDF: $PDF" 1>&2
 echo "Pages: $PAGE_COUNT" 1>&2
 echo "Working directory: $DIR" 1>&2
+echo "Intermediate file format: $MIDDLE_FORMAT" 1>&2
 
 NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress -png "$PDF" "$DIR/$PREFIX" 2>&1 | grep /page | progress_bar PPM  >/dev/null
-#pdftoppm -r $DPI -progress "$PDF" "$DIR/$PREFIX" 2>&1 
+case $MIDDLE_FORMAT in
+	png)
+		pdftoppm -r $DPI -progress -png $EXPORT_ARG "$PDF" "$DIR/$PREFIX" 2>&1 
+		;;
+	ppm)
+		pdftoppm -r $DPI -progress $EXPORT_ARG "$PDF" "$DIR/$PREFIX" 2>&1 
+		;;
+esac
 
 # Convert output images to webp
-find $DIR -name '*.png' | while read x; do convert_to_webp "$x"; done | progress_bar WEBP >/dev/null
+find $DIR -regex '.*\.png' -o -regex '.*\.ppm' | while read x; do convert_page "$x"; done | progress_bar WEBP >/dev/null
 
 # Create CBZ archive
-zip --junk-paths "$CBZ_NAME" $DIR/*.webp | progress_bar ZIP >/dev/null
+zip --junk-paths "$CBZ_NAME" $DIR/*.$PAGE_FORMAT | progress_bar ZIP >/dev/null
 
