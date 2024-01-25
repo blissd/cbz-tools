@@ -2,8 +2,8 @@
 #
 # Repacks a CBZ file to convert page images to WEBP or AVIF files
 
-SOURCE=""
-TARGET=""
+SOURCE_CBZ=""
+TARGET_CBZ=""
 WORK_DIR="$(mktemp -d)"
 RESIZE="100%"
 PAGE_FORMAT=avif
@@ -47,7 +47,7 @@ done
 
 shift $(($OPTIND -1))
 
-SOURCE="$1"
+SOURCE_CBZ="$1"
 
 cleanup() {
 	rm -rf $WORK_DIR
@@ -55,41 +55,55 @@ cleanup() {
 
 trap 'cleanup' ERR EXIT
 
-if [ "$TARGET" = "" ]; then
-	DIR="$(dirname "$SOURCE")"
-	TARGET="$(basename "$SOURCE")"
-	TARGET="$DIR/${TARGET%.*}-$PAGE_FORMAT.cbz"
+if [ "$TARGET_CBZ" = "" ]; then
+	DIR="$(dirname "$SOURCE_CBZ")"
+	FILE="$(basename "$SOURCE_CBZ")"
+	TARGET_CBZ="$DIR/${FILE%.*}-$PAGE_FORMAT.cbz"
 fi
 
-echo $TARGET
+echo $TARGET_CBZ
 
-unzip "$SOURCE" -d "$WORK_DIR"
+# Extract original CBZ to source directory
+SOURCE_DIR="$WORK_DIR/source"
+mkdir -p "$SOURCE_DIR"
+
+# Construct repacked CBZ in target directory
+TARGET_DIR="$WORK_DIR/target"
+mkdir -p "$TARGET_DIR"
+
+unzip "$SOURCE_CBZ" -d "$SOURCE_DIR"
 
 # Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
-find "$WORK_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
+find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
   # sanitize file names.
   ext="${x##*.}"
-  page_name=$(printf "$WORK_DIR/page-%03d.$ext" "$page_count")
-  mv "$x" "$page_name"  
-  let page_count=page_count+1
+  sane_page_name=$(printf "$SOURCE_DIR/page-%03d.$ext" "$page_count")
 
-  echo "$page_name" >> $WORK_DIR/source-file-names
+	if [[ "$x" != "$sane_page_name" ]]; then
+  	mv "$x" "$sane_page_name"  
+	fi
+
+  let page_count=page_count+1
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-  echo echo magick convert "$page_name" -resize "$RESIZE" "${page_name%.*}.$PAGE_FORMAT" '&&' magick convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.$PAGE_FORMAT" >> $WORK_DIR/convert
+	target_page_name="${sane_page_name%.*}.$PAGE_FORMAT"
+	target_page_name="$TARGET_DIR/$(basename "$target_page_name")"
+
+  CMD="magick convert '$sane_page_name' -resize $RESIZE '$target_page_name'"
+	echo echo "$CMD" '&&' "$CMD" >> $WORK_DIR/convert
 done
 
 # Run image file conversions in parallel
 cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
-# Prune files that shouldn't be in the CBZ archive
-cat $WORK_DIR/source-file-names | while read x; do rm "$x"; done
-
-rm $WORK_DIR/source-file-names $WORK_DIR/convert
+# Copy ComicInfo.xml if it exists
+if [ -f "$SOURCE_DIR/ComicInfo.xml" ]; then
+	cp "$SOURCE_DIR/ComicInfo.xml" "$TARGET_DIR"
+fi
 
 # Create CBZ archive
-echo zip --junk-paths "$TARGET" "$WORK_DIR/*"
-zip --junk-paths "$TARGET" "$WORK_DIR"/*
+echo zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR/*"
+zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR"/*
 
