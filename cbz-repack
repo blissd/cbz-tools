@@ -17,32 +17,32 @@ usage() {
 }
 
 while getopts ":hq:o:r:f:n:" opt; do
-    case $opt in
-        h)
-            usage
-            exit
-            ;;
+  case $opt in
+  h)
+    usage
+    exit
+    ;;
 	n)
-	   NCPU="$OPTARG"
-	   ;;
+	  NCPU="$OPTARG"
+	  ;;
 	f)
-	   PAGE_FORMAT="$OPTARG"
-	   ;;
+	  PAGE_FORMAT="$OPTARG"
+	  ;;
 	r)
-	    RESIZE="$OPTARG"
-	    ;;
-        o)
-            OUT_NAME="$OPTARG"
-            ;;
-		\?)
-			echo "Invalid option: $OPTARG" 1>&2
-			exit 1
-			;;
-		:)
-			echo "Invalid option: -$OPTARG requires an argument" 1>&2
-			exit 1
-		    ;;
-    esac
+	  RESIZE="$OPTARG"
+	  ;;
+  o)
+    TARGET_CBZ="$OPTARG"
+    ;;
+	\?)
+		echo "Invalid option: $OPTARG" 1>&2
+		exit 1
+		;;
+	:)
+		echo "Invalid option: -$OPTARG requires an argument" 1>&2
+		exit 1
+		;;
+	esac
 done
 
 shift $(($OPTIND -1))
@@ -75,24 +75,22 @@ unzip "$SOURCE_CBZ" -d "$SOURCE_DIR"
 
 # Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
-find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
-  # sanitize file names.
-  ext="${x##*.}"
-  sane_page_name=$(printf "$SOURCE_DIR/page-%03d.$ext" "$page_count")
+find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read page_name; do
 
-	if [[ "$x" != "$sane_page_name" ]]; then
-  	mv "$x" "$sane_page_name"  
-	fi
+  # Compute name to convert to in target directory
+  target_page_name=$(printf "$TARGET_DIR/page-%03d.$PAGE_FORMAT" "$page_count")
 
-  let page_count=page_count+1
+	# Double escape source page name to fix janky file names
+	page_name="${page_name@Q}"
+	#echo "Escaped: [${page_name}]"
+	#echo "Escaped twice: [${page_name@Q}]"
+  CMD="magick convert ${page_name@Q} -resize $RESIZE '$target_page_name'"
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-	target_page_name="${sane_page_name%.*}.$PAGE_FORMAT"
-	target_page_name="$TARGET_DIR/$(basename "$target_page_name")"
-
-  CMD="magick convert '$sane_page_name' -resize $RESIZE '$target_page_name'"
 	echo echo "$CMD" '&&' "$CMD" >> $WORK_DIR/convert
+
+  let page_count=page_count+1
 done
 
 # Run image file conversions in parallel
