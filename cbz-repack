@@ -4,7 +4,7 @@
 
 SOURCE=""
 TARGET=""
-DIR="$(mktemp -d)"
+WORK_DIR="$(mktemp -d)"
 RESIZE="100%"
 PAGE_FORMAT=avif
 
@@ -50,45 +50,46 @@ shift $(($OPTIND -1))
 SOURCE="$1"
 
 cleanup() {
-	rm -rf $DIR
+	rm -rf $WORK_DIR
 }
 
 trap 'cleanup' ERR EXIT
 
 if [ "$TARGET" = "" ]; then
+	DIR="$(dirname "$SOURCE")"
 	TARGET="$(basename "$SOURCE")"
-	TARGET="${TARGET%.*}-$PAGE_FORMAT.cbz"
+	TARGET="$DIR/${TARGET%.*}-$PAGE_FORMAT.cbz"
 fi
 
 echo $TARGET
 
-unzip "$SOURCE" -d "$DIR"
+unzip "$SOURCE" -d "$WORK_DIR"
 
 # Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
-find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
+find "$WORK_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
   # sanitize file names.
   ext="${x##*.}"
-  page_name=$(printf "$DIR/page-%03d.$ext" "$page_count")
+  page_name=$(printf "$WORK_DIR/page-%03d.$ext" "$page_count")
   mv "$x" "$page_name"  
   let page_count=page_count+1
 
-  echo "$page_name" >> $DIR/source-file-names
+  echo "$page_name" >> $WORK_DIR/source-file-names
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-  echo echo magick convert "$page_name" -resize "$RESIZE" "${page_name%.*}.$PAGE_FORMAT" '&&' magick convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.$PAGE_FORMAT" >> $DIR/convert
+  echo echo magick convert "$page_name" -resize "$RESIZE" "${page_name%.*}.$PAGE_FORMAT" '&&' magick convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.$PAGE_FORMAT" >> $WORK_DIR/convert
 done
 
 # Run image file conversions in parallel
-cat $DIR/convert | xargs -P $NCPU -I{} sh -c {}
+cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
 # Prune files that shouldn't be in the CBZ archive
-cat $DIR/source-file-names | while read x; do rm "$x"; done
+cat $WORK_DIR/source-file-names | while read x; do rm "$x"; done
 
-rm $DIR/source-file-names $DIR/convert
+rm $WORK_DIR/source-file-names $WORK_DIR/convert
 
 # Create CBZ archive
-echo zip --junk-paths "$TARGET" "$DIR/*"
-zip --junk-paths "$TARGET" "$DIR"/*
+echo zip --junk-paths "$TARGET" "$WORK_DIR/*"
+zip --junk-paths "$TARGET" "$WORK_DIR"/*
 
