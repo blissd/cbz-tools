@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Repacks a CBZ file to convert JPEG files to WEBP files
+# Repacks a CBZ file to convert page images to WEBP or AVIF files
 
 SOURCE=""
 TARGET=""
@@ -8,20 +8,26 @@ DIR="$(mktemp -d)"
 RESIZE="100%"
 PAGE_FORMAT=avif
 
+# Number of images to convert in parallel
+NCPU="$(nproc)"
+
 usage() {
-	echo "cbz-repack [-f avif|webp] [-r resize percentage] comic.cbz"
+	echo "cbz-repack [-n parallelism] [-f avif|webp] [-r resize percentage] comic.cbz"
 	exit 0
 }
 
-while getopts ":hq:o:r:f:" opt; do
+while getopts ":hq:o:r:f:n:" opt; do
     case $opt in
         h)
             usage
             exit
             ;;
+	n)
+	   NCPU="$OPTARG"
+	   ;;
 	f)
 	   PAGE_FORMAT="$OPTARG"
-	;;
+	   ;;
 	r)
 	    RESIZE="$OPTARG"
 	    ;;
@@ -58,13 +64,7 @@ echo $TARGET
 
 unzip "$SOURCE" -d "$DIR"
 
-# Convert output images 
-#for x in $(find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}'); do
-	#echo magick convert "$x" "${x%.*}.$PAGE_FORMAT"
-	#magick convert "$x" "${x%.*}.$PAGE_FORMAT"
-	#rm "$x"
-#done
-
+# Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
 find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read x; do
   # sanitize file names.
@@ -74,13 +74,16 @@ find "$DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) 
   let page_count=page_count+1
 
   echo "$page_name" >> $DIR/source-file-names
+
+  # Append commands to execute to a file which can then be run through xargs to do the
+  # image conversions in parallel
   echo echo magick convert "$page_name" -resize "$RESIZE" "${page_name%.*}.$PAGE_FORMAT" '&&' magick convert "$page_name" -resize "$RESIZE"% "${page_name%.*}.$PAGE_FORMAT" >> $DIR/convert
 done
 
-NCPU="$(nproc)"
-
+# Run image file conversions in parallel
 cat $DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
+# Prune files that shouldn't be in the CBZ archive
 cat $DIR/source-file-names | while read x; do rm "$x"; done
 
 rm $DIR/source-file-names $DIR/convert
