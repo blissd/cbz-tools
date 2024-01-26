@@ -61,7 +61,7 @@ if [ "$TARGET_CBZ" = "" ]; then
 	TARGET_CBZ="$DIR/${FILE%.*}-$PAGE_FORMAT.cbz"
 fi
 
-echo $TARGET_CBZ
+echo "Archive: $SOURCE_CBZ"
 
 # Extract original CBZ to source directory
 SOURCE_DIR="$WORK_DIR/source"
@@ -88,7 +88,7 @@ find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/ima
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-	echo echo "$CMD" '&&' "$CMD" >> $WORK_DIR/convert
+	echo echo -n . '&&' "$CMD" >> $WORK_DIR/convert
 	echo "Page count: $page_count" > $WORK_DIR/page_count_msg
 
   let page_count=page_count+1
@@ -98,6 +98,8 @@ cat $WORK_DIR/page_count_msg
 
 # Run image file conversions in parallel
 cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
+
+echo
 
 # Copy ComicInfo.xml if it exists
 if [ -f "$SOURCE_DIR/ComicInfo.xml" ]; then
