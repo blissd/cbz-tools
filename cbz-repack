@@ -71,7 +71,7 @@ mkdir -p "$SOURCE_DIR"
 TARGET_DIR="$WORK_DIR/target"
 mkdir -p "$TARGET_DIR"
 
-unzip "$SOURCE_CBZ" -d "$SOURCE_DIR"
+unzip -q "$SOURCE_CBZ" -d "$SOURCE_DIR"
 
 # Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
@@ -105,6 +105,6 @@ if [ -f "$SOURCE_DIR/ComicInfo.xml" ]; then
 fi
 
 # Create CBZ archive
-echo zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR/*"
-zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR"/*
+#echo zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR/*"
+zip -q --junk-paths "$TARGET_CBZ" "$TARGET_DIR"/*
 
