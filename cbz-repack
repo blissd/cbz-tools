@@ -89,9 +89,12 @@ find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/ima
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
 	echo echo "$CMD" '&&' "$CMD" >> $WORK_DIR/convert
+	echo "Page count: $page_count" > $WORK_DIR/page_count_msg
 
   let page_count=page_count+1
 done
+
+cat $WORK_DIR/page_count_msg
 
 # Run image file conversions in parallel
 cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
