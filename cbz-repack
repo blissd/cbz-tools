@@ -54,7 +54,7 @@ cleanup() {
 	rm -rf $WORK_DIR
 }
 
-trap 'cleanup' ERR EXIT
+#trap 'cleanup' ERR EXIT
 
 if [ "$TARGET_CBZ" = "" ]; then
 	DIR="$(dirname "$SOURCE_CBZ")"
@@ -62,6 +62,8 @@ if [ "$TARGET_CBZ" = "" ]; then
 	TARGET_CBZ="$DIR/${FILE%.*}-$PAGE_FORMAT.cbz"
 	TARGET_CBZ="$(realpath "$TARGET_CBZ")"
 fi
+
+echo "Work Dir: $WORK_DIR"
 echo "Archive: $SOURCE_CBZ"
 
 # Extract original CBZ to source directory
@@ -102,7 +104,7 @@ find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
   page_name="${page_name@Q}"
   target_page_name="${target_page_name@Q}"
   if [[ "$PAGE_FORMAT" = "jxl" ]]; then
-	  CMD="cjxl ${page_name@Q} ${target_page_name@Q}"
+	  CMD="cjxl --lossless_jpeg=0 --distance=3 ${page_name@Q} ${target_page_name@Q}"
 	else
 		CMD="magick ${page_name@Q} -resize '$RESIZE_PERCENT%' ${target_page_name@Q}"
   fi
@@ -125,7 +127,6 @@ cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
 echo
 
 # Create CBZ archive
-cd $TARGET_DIR
-echo zip -q -r "$TARGET_CBZ" "$TARGET_DIR"
+cd "$TARGET_DIR"
 zip -q -r "$TARGET_CBZ" .
 
