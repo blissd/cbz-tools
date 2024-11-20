@@ -9,10 +9,11 @@ RESIZE_PERCENT="100"
 PAGE_FORMAT=avif
 
 # Number of images to convert in parallel
-NCPU="$(nproc)"
+#NCPU="$(nproc)"
+NCPU=8
 
 usage() {
-	echo "cbz-repack [-n parallelism] [-f avif|webp] [-r resize percentage] comic.cbz"
+	echo "cbz-repack [-n parallelism] [-f avif|webp|jxl] [-r resize percentage] comic.cbz"
 	exit 0
 }
 
@@ -59,8 +60,8 @@ if [ "$TARGET_CBZ" = "" ]; then
 	DIR="$(dirname "$SOURCE_CBZ")"
 	FILE="$(basename "$SOURCE_CBZ")"
 	TARGET_CBZ="$DIR/${FILE%.*}-$PAGE_FORMAT.cbz"
+	TARGET_CBZ="$(realpath "$TARGET_CBZ")"
 fi
-
 echo "Archive: $SOURCE_CBZ"
 
 # Extract original CBZ to source directory
@@ -73,22 +74,44 @@ mkdir -p "$TARGET_DIR"
 
 unzip -q -o "$SOURCE_CBZ" -d "$SOURCE_DIR"
 
+# Create target folders.
+find "$SOURCE_DIR" -type d -printf "$TARGET_DIR/%P\0" | xargs -r0 mkdir -p
+
 # Find all images from CBZ archive. Use file mime type rather than file extension.
 page_count=1
-find "$SOURCE_DIR" -type f -exec file --mime-type {} \+ | awk -F: '{if ($2 ~/image\//) print $1}' | sort | while read page_name; do
+find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
 
-  # Compute name to convert to in target directory
-  target_page_name=$(printf "$TARGET_DIR/page-%03d.$PAGE_FORMAT" "$page_count")
+	# Copy non-image files as-is
+	
+	mime_type=$(file --brief --mime-type "$SOURCE_DIR/$file_name")
+	if [[ ! "$mime_type" =~ "image" ]]; then
+		target_file_name="$TARGET_DIR/$file_name"
+		mv "$SOURCE_DIR/${file_name}" "${target_file_name}"
+		continue
+	fi
 
 	# Double escape source page name to fix janky file names
-	page_name="${page_name@Q}"
+	page_name="$SOURCE_DIR/${file_name}"
+
 	#echo "Escaped: [${page_name}]"
 	#echo "Escaped twice: [${page_name@Q}]"
-  CMD="magick convert ${page_name@Q} -resize '$RESIZE_PERCENT%' '$target_page_name'"
+  # Compute name to convert to in target directory
+  target_page_name="$TARGET_DIR/${file_name%.*}"
+  target_page_name="${target_page_name}.$PAGE_FORMAT"
+
+  page_name="${page_name@Q}"
+  target_page_name="${target_page_name@Q}"
+  if [[ "$PAGE_FORMAT" = "jxl" ]]; then
+	  CMD="cjxl ${page_name@Q} ${target_page_name@Q}"
+	else
+		CMD="magick ${page_name@Q} -resize '$RESIZE_PERCENT%' ${target_page_name@Q}"
+  fi
+  #echo $CMD
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-	echo echo -n . '&&' "$CMD" >> $WORK_DIR/convert
+	#echo echo -n . '&&' ">/dev/null 2>&1 $CMD" >> $WORK_DIR/convert
+	echo echo -n . '&&' ">/dev/null 2>&1 $CMD" >> $WORK_DIR/convert
 	echo "Page count: $page_count" > $WORK_DIR/page_count_msg
 
   let page_count=page_count+1
@@ -101,12 +124,8 @@ cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
 echo
 
-# Copy ComicInfo.xml if it exists
-if [ -f "$SOURCE_DIR/ComicInfo.xml" ]; then
-	cp "$SOURCE_DIR/ComicInfo.xml" "$TARGET_DIR"
-fi
-
 # Create CBZ archive
-#echo zip --junk-paths "$TARGET_CBZ" "$TARGET_DIR/*"
-zip -q --junk-paths "$TARGET_CBZ" "$TARGET_DIR"/*
+cd $TARGET_DIR
+echo zip -q -r "$TARGET_CBZ" "$TARGET_DIR"
+zip -q -r "$TARGET_CBZ" .
 
