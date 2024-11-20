@@ -5,10 +5,10 @@ DPI=400
 PREFIX=page
 CBZ_NAME=""
 DIR=$(mktemp -d)
-PAGE_FORMAT=avif
+PAGE_FORMAT=jpeg
 
 usage() {
-	echo "pdf-to-cbz [-d 400] [-f jpeg|webp|avif] [-o comic.cbz] comic.pdf"
+	echo "pdf-to-cbz [-d 400] [-f jpeg|jxl|webp|avif] [-o comic.cbz] comic.pdf"
 	exit 0
 }
 
@@ -39,17 +39,17 @@ while getopts ":ho:d:i:f:" opt; do
 done
 
 if ! command -v pdfinfo >/dev/null 2>&1; then
-  echo "Error: please install pdfinfo." 1>&2
+  echo "Error: please install poppler-utils for pdfinfo." 1>&2
   exit 1
 fi
 
 if ! command -v pdftoppm >/dev/null 2>&1; then
-  echo "Error: please install pdftoppm." 1>&2
+  echo "Error: please install poppler-utils for pdftoppm." 1>&2
   exit 1
 fi
 
 if ! command -v magick >/dev/null 2>&1; then
-  echo "Error: please install ImageMagic." 1>&2
+  echo "Error: please install ImageMagick." 1>&2
   exit 1
 fi
 
@@ -65,13 +65,21 @@ cleanup() {
 }
 
 progress_bar() {
-    echo "Stage: $1"
-    while read x; do echo .; done
+    echo "Stage: $1 "
+    while read x; do echo -n .; done
+		echo
 }
 
 convert_page() {
     OUT="${1%.*}.$PAGE_FORMAT"
-    magick convert "$1" "$OUT"
+		if [ "$PAGE_FORMAT" = "png" ]; then
+			mv "$1" "$OUT"
+		elif [ "$PAGE_FORMAT" = "jxl" ]; then
+			cjxl -d 6 "$1" "$OUT"
+		else
+    	magick convert "$1" "$OUT"
+		fi
+
     echo "$OUT"
 }
 
@@ -81,7 +89,7 @@ trap 'cleanup' ERR EXIT
 
 if [ "$CBZ_NAME" = "" ]; then
 	CBZ_NAME="$(basename "$PDF")"
-	CBZ_NAME="$(dirname "$PDF")/${CBZ_NAME%.*}.cbz"
+	CBZ_NAME="$(dirname "$PDF")/${CBZ_NAME%.*} ($PAGE_FORMAT).cbz"
 fi
 
 echo "PDF: $PDF" 1>&2
@@ -91,11 +99,10 @@ echo "Working directory: $DIR" 1>&2
 NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress -png $EXPORT_ARG "$PDF" "$DIR/$PREFIX" 2>&1 
+pdftoppm -r $DPI -progress -png $EXPORT_ARG "$PDF" "$DIR/$PREFIX" 
 
 # Convert page images
-find $DIR -regex '.*\.png' | while read x; do convert_page "$x"; done | progress_bar CONVERT >/dev/null
+find $DIR -regex '.*\.png' | while read x; do convert_page "$x"; done 2>/dev/null
 
 # Create CBZ archive
-zip --junk-paths "$CBZ_NAME" $DIR/*.$PAGE_FORMAT | progress_bar ZIP >/dev/null
-
+zip -q --junk-paths "$CBZ_NAME" $DIR/*.$PAGE_FORMAT
