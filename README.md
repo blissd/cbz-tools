@@ -3,7 +3,7 @@
 Command-line tools for processing comic archive (CBZ) files.
 
 * _cbz-repack_ Convert file formats and resize images.
-* _pdf-to-cbz_ Convert PDF documents to CBZ archives. Useful when [Humble Bundles](https://www.humblebundle.com/) of comics on come in a PDF format.
+* _pdf-to-cbz_ Convert PDF documents to CBZ archives. Useful when [Humble Bundles](https://www.humblebundle.com/) of comics only come in a PDF format.
 
 ## cbz-repack
 
