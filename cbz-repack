@@ -57,7 +57,7 @@ cleanup() {
 	rm -rf $WORK_DIR
 }
 
-#trap 'cleanup' ERR EXIT
+trap 'cleanup' ERR EXIT
 
 if [ "$TARGET_CBZ" = "" ]; then
 	DIR="$(dirname "$SOURCE_CBZ")"
