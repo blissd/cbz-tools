@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 #
+# SPDX-FileCopyrightText: © 2024 David Bliss <vivid.map6767@davidbliss.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
 # Repacks a CBZ file to convert page images to other file formats.
 
 SOURCE_CBZ=""

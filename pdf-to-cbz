@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 #
+# SPDX-FileCopyrightText: © 2024 David Bliss <vivid.map6767@davidbliss.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Converts PDF documents to comic book archives (CBZ).
 
 DPI=400
 PREFIX=page
