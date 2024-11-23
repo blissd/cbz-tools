@@ -53,6 +53,11 @@ if ! command -v magick >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v cjxl >/dev/null 2>&1; then
+  echo "Error: please install libjxl-utils." 1>&2
+  exit 1
+fi
+
 shift $((OPTIND-1))
 
 PDF="$1"
@@ -75,9 +80,9 @@ convert_page() {
 		if [ "$PAGE_FORMAT" = "png" ]; then
 			mv "$1" "$OUT"
 		elif [ "$PAGE_FORMAT" = "jxl" ]; then
-			cjxl -d 6 "$1" "$OUT"
+			cjxl --lossless_jpeg=0 --distance=3 "$1" "$OUT"
 		else
-    	magick convert "$1" "$OUT"
+    	   magick convert "$1" "$OUT"
 		fi
 
     echo "$OUT"
@@ -99,7 +104,7 @@ echo "Working directory: $DIR" 1>&2
 NCPU=$(nproc)
 
 # Extract pages as images.
-pdftoppm -r $DPI -progress -png $EXPORT_ARG "$PDF" "$DIR/$PREFIX" 
+pdftoppm -r $DPI -progress -png $EXPORT_ARG "$PDF" "$DIR/$PREFIX"
 
 # Convert page images
 find $DIR -regex '.*\.png' | while read x; do convert_page "$x"; done 2>/dev/null

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Repacks a CBZ file to convert page images to WEBP or AVIF files
+# Repacks a CBZ file to convert page images to other file formats.
 
 SOURCE_CBZ=""
 TARGET_CBZ=""
@@ -84,7 +84,7 @@ page_count=1
 find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
 
 	# Copy non-image files as-is
-	
+
 	mime_type=$(file --brief --mime-type "$SOURCE_DIR/$file_name")
 	if [[ ! "$mime_type" =~ "image" ]]; then
 		target_file_name="$TARGET_DIR/$file_name"
@@ -92,19 +92,17 @@ find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
 		continue
 	fi
 
-	# Double escape source page name to fix janky file names
 	page_name="$SOURCE_DIR/${file_name}"
 
-	#echo "Escaped: [${page_name}]"
-	#echo "Escaped twice: [${page_name@Q}]"
   # Compute name to convert to in target directory
   target_page_name="$TARGET_DIR/${file_name%.*}"
   target_page_name="${target_page_name}.$PAGE_FORMAT"
 
+  # Double escape source page name to fix janky file names
   page_name="${page_name@Q}"
   target_page_name="${target_page_name@Q}"
   if [[ "$PAGE_FORMAT" = "jxl" ]]; then
-	  CMD="cjxl --lossless_jpeg=0 --distance=3 ${page_name@Q} ${target_page_name@Q}"
+	   CMD="cjxl --lossless_jpeg=0 --distance=3 ${page_name@Q} ${target_page_name@Q}"
 	else
 		CMD="magick ${page_name@Q} -resize '$RESIZE_PERCENT%' ${target_page_name@Q}"
   fi
@@ -112,7 +110,6 @@ find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
 
   # Append commands to execute to a file which can then be run through xargs to do the
   # image conversions in parallel
-	#echo echo -n . '&&' ">/dev/null 2>&1 $CMD" >> $WORK_DIR/convert
 	echo echo -n . '&&' ">/dev/null 2>&1 $CMD" >> $WORK_DIR/convert
 	echo "Page count: $page_count" > $WORK_DIR/page_count_msg
 
@@ -129,4 +126,3 @@ echo
 # Create CBZ archive
 cd "$TARGET_DIR"
 zip -q -r "$TARGET_CBZ" .
-
