@@ -32,7 +32,7 @@ Extracts pages from a PDF document and converts those pages to JPEG images and t
 Example usage:
 
 ```shell
-pdf-to-cbz my-comic.pdf;
+pdf-to-cbz my-comic.pdf
 ```
 
 Encode to a different file format (jxl, webp, and avif supported):
