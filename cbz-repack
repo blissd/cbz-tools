@@ -33,7 +33,7 @@ while getopts ":hq:o:r:f:n:" opt; do
 	  PAGE_FORMAT="$OPTARG"
 	  ;;
 	r)
-	  RESIZE="$OPTARG"
+	  RESIZE_PERCENT="$OPTARG"
 	  ;;
   o)
     TARGET_CBZ="$OPTARG"
@@ -104,11 +104,11 @@ find "$SOURCE_DIR" -type f -printf "%P\n" | while read file_name; do
   # Double escape source page name to fix janky file names
   page_name="${page_name@Q}"
   target_page_name="${target_page_name@Q}"
-  if [[ "$PAGE_FORMAT" = "jxl" ]]; then
-	   CMD="cjxl --lossless_jpeg=0 --distance=3 ${page_name@Q} ${target_page_name@Q}"
-	else
+  #if [[ "$PAGE_FORMAT" = "jxl" ]]; then
+	#   CMD="cjxl --lossless_jpeg=0 --distance=3 ${page_name@Q} ${target_page_name@Q}"
+	#else
 		CMD="magick ${page_name@Q} -resize '$RESIZE_PERCENT%' ${target_page_name@Q}"
-  fi
+  #fi
   #echo $CMD
 
   # Append commands to execute to a file which can then be run through xargs to do the
@@ -122,6 +122,7 @@ done
 cat $WORK_DIR/page_count_msg
 
 # Run image file conversions in parallel
+#cat $WORK_DIR/convert
 cat $WORK_DIR/convert | xargs -P $NCPU -I{} sh -c {}
 
 echo
